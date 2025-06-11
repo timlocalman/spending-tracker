@@ -40,7 +40,7 @@ with st.form("entry_form", clear_on_submit=True):
     cat_opts = ["Select Category"] + list(category_budgets.keys())
     category = st.selectbox("📂 Category", cat_opts, index=cat_opts.index(predicted_cat) if predicted_cat in cat_opts else 0)
     qty = st.number_input("🔢 Quantity", min_value=1, step=1)
-    amount = st.number_input("💸 Amount", min_value=0.0, step=0.01)
+    amount = st.number_input("💸 Amount", min_value=0.0, step=500.0)
 
     if st.form_submit_button("✅ Submit"):
         if not re.fullmatch(r"[0-9:]+", time_input):
