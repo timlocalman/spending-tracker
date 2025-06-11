@@ -1,0 +1,7 @@
+[theme]
+base = "dark"
+primaryColor = "#00FF00"           # Neon green (for buttons/accents)
+backgroundColor = "#0D0D0D"        # Deep black background
+secondaryBackgroundColor = "#1A1A1A" # Dark gray for panels
+textColor = "#FFFFFF"              # White text
+font = "monospace"    
