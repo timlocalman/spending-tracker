@@ -3,7 +3,10 @@ st.set_page_config(page_title="Spending Tracker - Home", layout="wide")
 
 import pandas as pd
 from datetime import datetime
-from shared import load_all_data, refresh_data
+from shared import (
+    category_budgets, load_all_data, refresh_data,
+    get_today_total_amount, get_weekly_total_amount, get_monthly_total_amount
+)
 
 # Refresh button
 if st.button("🔄 Refresh Data", use_container_width=True):
@@ -15,6 +18,22 @@ df["Amount Spent"] = pd.to_numeric(df["Amount Spent"], errors="coerce")
 df["DATE_dt"] = pd.to_datetime(df["DATE"], format="%m/%d/%Y", errors='coerce')
 
 st.title("📋 Transaction Records")
+
+# --- METRICS ---
+with st.container():
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🗓️ Today", f"₦{get_today_total_amount():,.2f}")
+    col2.metric("📅 This Week", f"₦{get_weekly_total_amount():,.2f}")
+    col3.metric("📆 This Month", f"₦{get_monthly_total_amount():,.2f}")
+st.markdown("---")
+
+# --- MONTHLY BUDGET USAGE ---
+total_month = get_monthly_total_amount()
+total_budget = sum(v for k, v in category_budgets.items() if k.lower() not in ["savings", "income"])
+percent_used = total_month / total_budget if total_budget > 0 else 0
+st.markdown("### 🏁 Monthly Budget Usage")
+st.progress(min(percent_used, 1.0), text=f"₦{total_month:,.0f} of ₦{total_budget:,.0f} used ({percent_used*100:.1f}%)")
+st.markdown("---")
 
 # --- TODAY'S TRANSACTIONS ---
 st.markdown("### 📋 Today's Transactions")
