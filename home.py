@@ -10,17 +10,12 @@ import pandas as pd
 import re
 
 # Refresh button
-if st.button("🔄 Refresh Data", use_container_width=True):
+if st.button("🔄 Refresh Data"):
     refresh_data()
 
 # Load data
 df = pd.DataFrame(load_all_data())
 st.title("💸 Spending Tracker")
-
-# --- Time Button for Current Local Time (UTC+1) ---
-st.markdown("#### 🕒 Click to use current time (UTC+1)")
-if st.button("🕒 Use Current Time"):
-    st.session_state["prefill_time"] = (datetime.utcnow() + timedelta(hours=1)).strftime("%H:%M")
 
 # --- Recommendations ---
 df["Amount Spent"] = pd.to_numeric(df["Amount Spent"], errors="coerce")
@@ -32,7 +27,10 @@ if likely_items:
         if cols[idx].button(item):
             st.session_state["prefill_item"] = item
 st.markdown("---")
-
+# --- Time Button for Current Local Time (UTC+1) ---
+st.markdown("#### 🕒 Click to use current time (UTC+1)")
+if st.button("🕒 Use Current Time", use_container_width=True):
+    st.session_state["prefill_time"] = (datetime.utcnow() + timedelta(hours=1)).strftime("%H:%M")
 # --- Entry Form ---
 with st.form("entry_form", clear_on_submit=True):
     st.markdown("### ✍️ Add New Transaction")
