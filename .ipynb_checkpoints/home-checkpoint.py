@@ -17,9 +17,10 @@ if st.button("🔄 Refresh Data", use_container_width=True):
 df = pd.DataFrame(load_all_data())
 st.title("💸 Spending Tracker")
 
-# --- Time Quick-Fill ---
+# --- Time Button for Current Local Time (UTC+1) ---
+st.markdown("#### 🕒 Click to use current time (UTC+1)")
 if st.button("🕒 Use Current Time"):
-    st.session_state["prefill_time"] = datetime.now().strftime("%H:%M")
+    st.session_state["prefill_time"] = (datetime.utcnow() + timedelta(hours=1)).strftime("%H:%M")
 
 # --- Recommendations ---
 df["Amount Spent"] = pd.to_numeric(df["Amount Spent"], errors="coerce")
