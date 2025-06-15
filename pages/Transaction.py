@@ -9,7 +9,7 @@ from shared import (
 )
 
 # Refresh button
-if st.button("🔄 Refresh Data", use_container_width=True):
+if st.button("🔄 Refresh Data"):
     refresh_data()
 
 # Load data
