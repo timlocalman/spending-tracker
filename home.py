@@ -31,7 +31,9 @@ st.markdown("---")
 st.markdown("#### 🕒 Click to use current time (UTC+1)")
 if st.button("🕒 Use Current Time", use_container_width=True):
     st.session_state["prefill_time"] = (datetime.utcnow() + timedelta(hours=1)).strftime("%H:%M")
-# --- Entry Form ---
+# Checkbox outside the form so it updates instantly
+manual_entry = st.checkbox("📝 Enter total amount manually?", key="manual_toggle")
+
 with st.form("entry_form", clear_on_submit=True):
     st.markdown("### ✍️ Add New Transaction")
     selected_date = st.date_input("📆 Date", datetime.today())
@@ -47,9 +49,19 @@ with st.form("entry_form", clear_on_submit=True):
     predicted_cat = item_map.get(item.lower(), "Select Category")
     cat_opts = ["Select Category"] + list(category_budgets.keys())
     category = st.selectbox("📂 Category", cat_opts, index=cat_opts.index(predicted_cat) if predicted_cat in cat_opts else 0)
-    qty = st.number_input("🔢 Quantity", min_value=1, step=1)
-    amount = st.number_input("💸 Amount", min_value=0.0, step=0.01)
 
+    # Always ask for quantity
+    qty = st.number_input("🔢 Quantity", min_value=1, step=1, value=1)
+
+    if manual_entry:
+        amount = st.number_input("💸 Total Amount", min_value=0.0, step=0.01, key="manual_amount")
+        st.caption(f"💡 Total entered manually for quantity x {qty}")
+    else:
+        unit_price = st.number_input("💰 Price per Unit", min_value=0.0, step=0.01, key="unit_price")
+        amount = qty * unit_price
+        st.info(f"💵 Auto-calculated total = ₦{amount:,.2f}")
+
+    # Submit logic
     if st.form_submit_button("✅ Submit"):
         if not re.fullmatch(r"[0-9:]+", time_input):
             st.warning("⚠️ Invalid time format.")
@@ -57,6 +69,8 @@ with st.form("entry_form", clear_on_submit=True):
             st.warning("⚠️ Please select a valid category.")
         elif not item:
             st.warning("⚠️ Item name is required.")
+        elif amount <= 0:
+            st.warning("⚠️ Amount must be greater than ₦0.")
         else:
             row = [
                 f"{selected_date.month}/{selected_date.day}/{selected_date.year}",
