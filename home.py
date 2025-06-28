@@ -26,31 +26,47 @@ if likely_items:
     for idx, item in enumerate(likely_items):
         if cols[idx].button(item):
             st.session_state["prefill_item"] = item
+
 st.markdown("---")
-# --- Time Button for Current Local Time (UTC+1) ---
-st.markdown("#### 🕒 Click to use current time (UTC+1)")
-if st.button("🕒 Use Current Time", use_container_width=True):
-    st.session_state["prefill_time"] = (datetime.utcnow() + timedelta(hours=1)).strftime("%H:%M")
-# Checkbox outside the form so it updates instantly
+
+# --- Time Selection Logic ---
+st.markdown("#### 🕒 Time Selection (UTC+1)")
+use_current_time = st.checkbox("🕒 Use Current Time (UTC+1)", value=False)
+if use_current_time:
+    current_time_str = (datetime.utcnow() + timedelta(hours=1)).strftime("%H:%M")
+    st.session_state["prefill_time"] = current_time_str
+else:
+    st.session_state.pop("prefill_time", None)
+
+# Checkbox for manual amount entry (outside form so it updates instantly)
 manual_entry = st.checkbox("📝 Enter total amount manually?", key="manual_toggle")
 
+# --- Transaction Entry Form ---
 with st.form("entry_form", clear_on_submit=True):
     st.markdown("### ✍️ Add New Transaction")
     selected_date = st.date_input("📆 Date", datetime.today())
 
     time_input = st.text_input(
         "⏰ Time (e.g. 14:30)",
-        value=st.session_state.get("prefill_time", "")
+        value=st.session_state.get("prefill_time", ""),
+        disabled=use_current_time
     )
 
     prefill_item = st.session_state.get("prefill_item", "")
     item = st.text_input("🛒 Item", value=prefill_item).strip()
+
+    # Category input as horizontal radio buttons
     item_map = load_item_category_map()
     predicted_cat = item_map.get(item.lower(), "Select Category")
     cat_opts = ["Select Category"] + list(category_budgets.keys())
-    category = st.radio("📂 Category", cat_opts, index=cat_opts.index(predicted_cat) if predicted_cat in cat_opts else 0, horizontal=True)
+    category = st.radio(
+        "📂 Category",
+        cat_opts,
+        index=cat_opts.index(predicted_cat) if predicted_cat in cat_opts else 0,
+        horizontal=True
+    )
 
-    # Always ask for quantity
+    # Quantity slider input
     qty = st.slider("🔢 Quantity", min_value=1, max_value=10, value=1, step=1)
 
     if manual_entry:
