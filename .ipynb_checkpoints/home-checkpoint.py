@@ -48,10 +48,10 @@ with st.form("entry_form", clear_on_submit=True):
     item_map = load_item_category_map()
     predicted_cat = item_map.get(item.lower(), "Select Category")
     cat_opts = ["Select Category"] + list(category_budgets.keys())
-    category = st.selectbox("📂 Category", cat_opts, index=cat_opts.index(predicted_cat) if predicted_cat in cat_opts else 0)
+    category = st.radio("📂 Category", cat_opts, index=cat_opts.index(predicted_cat) if predicted_cat in cat_opts else 0, horizontal=True)
 
     # Always ask for quantity
-    qty = st.number_input("🔢 Quantity", min_value=1, step=1, value=1)
+    qty = st.slider("🔢 Quantity", min_value=1, max_value=10, value=1, step=1)
 
     if manual_entry:
         amount = st.number_input("💸 Total Amount", min_value=0.0, step=0.01, key="manual_amount")
