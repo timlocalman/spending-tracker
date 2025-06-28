@@ -98,5 +98,24 @@ with st.form("entry_form", clear_on_submit=True):
             Spending_Sheet.append_row(row)
             st.cache_data.clear()
             st.success("✅ Transaction submitted!")
+
+            # 🎧 Audio confirmation
+            st.markdown(
+                """
+                <audio id="success-sound" autoplay>
+                  <source src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" type="audio/ogg">
+                </audio>
+                <script>
+                const audio = document.getElementById("success-sound");
+                if (audio) audio.play();
+                </script>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # ⚠️ Big purchase warning
+            if amount >= 500:
+                st.warning("🚨 Big Purchase Alert! You just spent ₦{:,.2f}".format(amount))
+
             st.session_state.pop("prefill_item", None)
             st.session_state.pop("prefill_time", None)
