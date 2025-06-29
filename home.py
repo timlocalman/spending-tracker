@@ -114,7 +114,7 @@ with st.form("entry_form", clear_on_submit=True):
             )
 
             # ⚠️ Big purchase warning
-            if amount >= 500:
+            if amount >= 5000:
                 st.warning("🚨 Big Purchase Alert! You just spent ₦{:,.2f}".format(amount))
 
             st.session_state.pop("prefill_item", None)
