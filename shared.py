@@ -78,3 +78,9 @@ def save_transaction_metadata(DATE, No, LOCATION, LAT, LON, PAYMENT_TYPE):
         ])
     except Exception as e:
         st.error(f"❌ Failed to save metadata: {e}")
+        
+@st.cache_data(ttl=600)
+def load_transaction_metadata():
+    return Meta_Sheet.get_all_records(expected_headers=[
+        "DATE", "No", "LOCATION", "LAT", "LON", "PAYMENT_TYPE"
+    ])

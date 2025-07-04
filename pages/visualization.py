@@ -1,8 +1,9 @@
 import streamlit as st
 st.set_page_config(page_title="Spending Analytics", layout="wide")
 
-from shared import load_all_data, refresh_data, category_budgets
+from shared import load_all_data, refresh_data, category_budgets ,load_transaction_metadata
 import pandas as pd
+import pydeck as pdk
 import altair as alt
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -64,18 +65,67 @@ if not df_box.empty:
 else:
     st.info("ℹ️ Not enough data for this week's box plot.")
 st.markdown("---")
-# --- Category Budget Progress ---
-st.markdown("## 📂 Category Budget Tracking")
-df["MONTH"] = df["DATE_dt"].dt.strftime("%B %Y")
-df_month = df[df["MONTH"] == datetime.now().strftime("%B %Y")]
-cat_month = df_month.groupby("ITEM CATEGORY")["Amount Spent"].sum().reset_index()
+meta_df=pd.DataFrame(load_transaction_metadata())
+meta_df["LAT"] = pd.to_numeric(meta_df["LAT"], errors="coerce")
+meta_df["LON"] = pd.to_numeric(meta_df["LON"], errors="coerce")
+meta_df = meta_df.dropna(subset=["LAT", "LON"])
 
-for cat, budget in category_budgets.items():
-    if cat.lower() in ["savings", "income"]:
-        continue
-    spent = cat_month.loc[cat_month["ITEM CATEGORY"].str.lower() == cat.lower(), "Amount Spent"].sum()
-    percent = spent / budget if budget > 0 else 0
-    st.markdown(f"**{cat}** — ₦{spent:,.0f} / ₦{budget:,.0f} ({percent*100:.1f}%)")
-    st.progress(min(percent, 1.0))
+# Optional: Merge with main df to get category or amount info
+df_main = pd.DataFrame(load_all_data())
+df_main["No"] = df_main["No"].astype(str)
+meta_df["No"] = meta_df["No"].astype(str)
 
+map_df = pd.merge(meta_df, df_main, on=["DATE", "No"], how="left")
+
+if not map_df.empty:
+    st.markdown("### 📍 Spending Locations Map")
+    
+    layer = pdk.Layer(
+        "ScatterplotLayer",
+        data=map_df,
+        get_position='[LON, LAT]',
+        get_radius=100,
+        get_fill_color='[255, 140, 0, 160]',
+        pickable=True,
+        tooltip=True
+    )
+
+    tooltip = {
+        "html": """
+        <b>Location:</b> {LOCATION} <br/>
+        <b>Item:</b> {ITEM} <br/>
+        <b>Category:</b> {ITEM CATEGORY} <br/>
+        <b>Amount:</b> ₦{Amount Spent} <br/>
+        <b>Date:</b> {DATE}
+        """,
+        "style": {"backgroundColor": "steelblue", "color": "white"}
+    }
+
+    view_state = pdk.ViewState(
+        latitude=map_df["LAT"].mean(),
+        longitude=map_df["LON"].mean(),
+        zoom=11,
+        pitch=0
+    )
+
+    st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip=tooltip))
+else:
+    st.info("ℹ No location-tagged transactions yet.")
+
+st.markdown("### 🔥 Top Spending Hotspots")
+
+hotspots = map_df.groupby("LOCATION").agg({
+    "Amount Spent": "sum",
+    "DATE": "max",
+    "No": "count"
+}).rename(columns={
+    "Amount Spent": "Total Spent",
+    "DATE": "Last Visit",
+    "No": "Visit Count"
+}).sort_values("Visit Count", ascending=False).reset_index()
+
+st.dataframe(hotspots.style.format({
+    "Total Spent": "₦{:.0f}",
+    "Last Visit": lambda d: pd.to_datetime(d).strftime("%b %d, %Y")
+}))
 
