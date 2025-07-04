@@ -1,19 +1,22 @@
 import streamlit as st
-st.set_page_config(page_title="Spending Tracker - Entry", layout="wide")
-
+from streamlit_geolocation import streamlit_geolocation
 from shared import (
-    category_budgets, Spending_Sheet, load_all_data, load_item_category_map,
-    get_today_count, recommend_items_for_today, refresh_data
+    category_budgets, Spending_Sheet, Meta_Sheet,
+    load_all_data, load_item_category_map,
+    get_today_count, recommend_items_for_today,
+    refresh_data, save_transaction_metadata
 )
 from datetime import datetime, timedelta
 import pandas as pd
 import re
 
-# Refresh button
+st.set_page_config(page_title="Spending Tracker - Entry", layout="wide")
+
+# --- Refresh Button ---
 if st.button("🔄 Refresh Data"):
     refresh_data()
 
-# Load data
+# --- Load Existing Data ---
 df = pd.DataFrame(load_all_data())
 st.title("💸 Spending Tracker")
 
@@ -29,93 +32,100 @@ if likely_items:
 
 st.markdown("---")
 
-# --- Time Selection Logic ---
-st.markdown("#### 🕒 Time Selection (UTC+1)")
+# --- Time Selection ---
 use_current_time = st.checkbox("🕒 Use Current Time (UTC+1)", value=False)
 if use_current_time:
-    current_time_str = (datetime.utcnow() + timedelta(hours=1)).strftime("%H:%M")
-    st.session_state["prefill_time"] = current_time_str
+    st.session_state["prefill_time"] = (datetime.utcnow() + timedelta(hours=1)).strftime("%H:%M")
 else:
     st.session_state.pop("prefill_time", None)
 
-# Checkbox for manual amount entry (outside form so it updates instantly)
 manual_entry = st.checkbox("📝 Enter total amount manually?", key="manual_toggle")
 
-# --- Transaction Entry Form ---
+# --- Get Geolocation ---
+st.markdown("#### 📡 Getting GPS Location...")
+location = streamlit_geolocation()
+
+lat = location.get("latitude") if location else None
+lon = location.get("longitude") if location else None
+
+if lat is not None and lon is not None:
+    st.success(f"📍 Location captured: ({lat:.5f}, {lon:.5f})")
+    st.session_state["lat"] = lat
+    st.session_state["lon"] = lon
+else:
+    st.warning("⚠ Could not retrieve GPS coordinates. Please allow location access.")
+
+# --- Transaction Form ---
 with st.form("entry_form", clear_on_submit=True):
-    st.markdown("### ✍️ Add New Transaction")
     selected_date = st.date_input("📆 Date", datetime.today())
-
     time_input = st.text_input(
-        "⏰ Time (e.g. 14:30)",
-        value=st.session_state.get("prefill_time", ""),
-        disabled=use_current_time
+        "⏰ Time (HH:MM)", value=st.session_state.get("prefill_time", ""), disabled=use_current_time
     )
+    item = st.text_input("🛒 Item", value=st.session_state.get("prefill_item", "")).strip()
 
-    prefill_item = st.session_state.get("prefill_item", "")
-    item = st.text_input("🛒 Item", value=prefill_item).strip()
-
-    # Category input as horizontal radio buttons
+    # Category Prediction
     item_map = load_item_category_map()
-    predicted_cat = item_map.get(item.lower(), "Select Category")
-    cat_opts = ["Select Category"] + list(category_budgets.keys())
-    category = st.radio(
-        "📂 Category",
-        cat_opts,
-        index=cat_opts.index(predicted_cat) if predicted_cat in cat_opts else 0,
-        horizontal=True
-    )
+    predicted = item_map.get(item.lower(), "Select Category")
+    categories = ["Select Category"] + list(category_budgets.keys())
+    category = st.radio("📂 Category", categories, index=categories.index(predicted) if predicted in categories else 0, horizontal=True)
 
-    # Quantity slider input
-    qty = st.slider("🔢 Quantity", min_value=1, max_value=10, value=1, step=1)
+    qty = st.slider("🔢 Quantity", 1, 10, 1)
 
     if manual_entry:
-        amount = st.number_input("💸 Total Amount", min_value=0.0, step=0.01, key="manual_amount")
-        st.caption(f"💡 Total entered manually for quantity x {qty}")
+        amount = st.number_input("💸 Total Amount", min_value=0.0, step=0.01, key="manual_amt")
+        st.caption(f"Manual total for {qty} unit(s)")
     else:
         unit_price = st.number_input("💰 Price per Unit", min_value=0.0, step=0.01, key="unit_price")
         amount = qty * unit_price
-        st.info(f"💵 Auto-calculated total = ₦{amount:,.2f}")
+        st.info(f"Auto total: ₦{amount:,.2f}")
 
-    # Submit logic
-    if st.form_submit_button("✅ Submit"):
-        if not re.fullmatch(r"[0-9:]+", time_input):
-            st.warning("⚠️ Invalid time format.")
-        elif category == "Select Category":
-            st.warning("⚠️ Please select a valid category.")
-        elif not item:
-            st.warning("⚠️ Item name is required.")
-        elif amount <= 0:
-            st.warning("⚠️ Amount must be greater than ₦0.")
-        else:
-            row = [
-                f"{selected_date.month}/{selected_date.day}/{selected_date.year}",
-                get_today_count() + 1,
-                time_input, item, category, qty, amount,
-                f"{(datetime.now() - timedelta(days=datetime.now().weekday())).day}-{datetime.now().strftime('%b')}",
-                datetime.now().strftime("%B %Y")
-            ]
-            Spending_Sheet.append_row(row)
-            st.cache_data.clear()
-            st.success("✅ Transaction submitted!")
+    location_name = st.text_input("📍 Location (manual input)")
+    payment_type = st.radio("💳 Payment Type", ["Cash", "Transfer", "Card"], horizontal=True)
 
-            # 🎧 Audio confirmation
-            st.markdown(
-                """
-                <audio id="success-sound" autoplay>
-                  <source src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" type="audio/ogg">
-                </audio>
-                <script>
-                const audio = document.getElementById("success-sound");
-                if (audio) audio.play();
-                </script>
-                """,
-                unsafe_allow_html=True
-            )
+    submitted = st.form_submit_button("✅ Submit")
 
-            # ⚠️ Big purchase warning
-            if amount >= 5000:
-                st.warning("🚨 Big Purchase Alert! You just spent ₦{:,.2f}".format(amount))
+# --- Handle Submission ---
+if submitted:
+    if not re.fullmatch(r"[0-9]{1,2}:[0-9]{2}", time_input):
+        st.warning("⚠ Invalid time format (HH:MM).")
+    elif category == "Select Category":
+        st.warning("⚠ Please select a valid category.")
+    elif not item:
+        st.warning("⚠ Item name is required.")
+    elif amount <= 0:
+        st.warning("⚠ Amount must be greater than ₦0.")
+    elif not location_name:
+        st.warning("⚠ Please enter a location name.")
+    elif lat is None or lon is None:
+        st.warning("⚠ Could not retrieve GPS coordinates. Please allow location access.")
+    else:
+        DATE = f"{selected_date.month}/{selected_date.day}/{selected_date.year}"
+        NO = get_today_count() + 1
 
-            st.session_state.pop("prefill_item", None)
-            st.session_state.pop("prefill_time", None)
+        # Save to Sheets
+        Spending_Sheet.append_row([
+            DATE, NO, time_input, item, category, qty, amount,
+            f"{(datetime.now().date() - timedelta(days=datetime.now().weekday())).day}-{datetime.now().strftime('%b')}",
+            datetime.now().strftime("%B %Y")
+        ])
+        save_transaction_metadata(DATE, NO, location_name, lat, lon, payment_type)
+
+        st.cache_data.clear()
+        st.success("✅ Transaction submitted!")
+
+        # Confirmation sound
+        st.markdown(
+            """
+            <audio autoplay>
+             <source src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" type="audio/ogg">
+            </audio>
+            """,
+            unsafe_allow_html=True
+        )
+
+        if amount >= 500:
+            st.warning(f"🚨 Big purchase alert: ₦{amount:,.2f}")
+
+        # Clear prefill state
+        for k in ["prefill_item", "prefill_time", "manual_amt", "unit_price"]:
+            st.session_state.pop(k, None)

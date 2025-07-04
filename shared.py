@@ -17,8 +17,10 @@ creds_dict = dict(st.secrets["gcp_service_account"])
 scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
 credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 gc = gspread.authorize(credentials)
+
 sheet = gc.open_by_url("https://docs.google.com/spreadsheets/d/1Pugi_cuQw25_GsGpVQAyzjWuuOFRLmP8yGKaIb6unD0/edit")
 Spending_Sheet = sheet.worksheet("My Spending Sheet")
+Meta_Sheet = sheet.worksheet("TransactionMeta")  # ✅ NEW: Metadata Sheet
 
 # --- DATA LOADERS ---
 @st.cache_data(ttl=600)
@@ -37,7 +39,7 @@ def load_item_category_map():
 # --- REFRESH FUNCTION ---
 def refresh_data():
     st.cache_data.clear()
-    st.rerun() 
+    st.rerun()
 
 # --- UTILITIES ---
 def get_today_count():
@@ -67,3 +69,12 @@ def recommend_items_for_today(df, top_n=5):
     today_weekday = datetime.now().strftime("%A")
     df_today = df[df["Weekday"] == today_weekday]
     return df_today["ITEM"].str.strip().value_counts().head(top_n).index.tolist()
+
+# --- NEW: Save Metadata to TransactionMeta Sheet ---
+def save_transaction_metadata(DATE, No, LOCATION, LAT, LON, PAYMENT_TYPE):
+    try:
+        Meta_Sheet.append_row([
+            DATE, No, LOCATION, LAT, LON, PAYMENT_TYPE
+        ])
+    except Exception as e:
+        st.error(f"❌ Failed to save metadata: {e}")
