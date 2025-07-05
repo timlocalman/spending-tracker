@@ -19,19 +19,7 @@ if st.button("🔄 Refresh Data"):
 # --- Load Existing Data ---
 df = pd.DataFrame(load_all_data())
 st.title("💸 Spending Tracker")
-
-# --- Recommendations ---
-df["Amount Spent"] = pd.to_numeric(df["Amount Spent"], errors="coerce")
-likely_items = recommend_items_for_today(df)
-if likely_items:
-    st.markdown("### 🛒 Items You Might Buy Today")
-    cols = st.columns(len(likely_items))
-    for idx, item in enumerate(likely_items):
-        if cols[idx].button(item):
-            st.session_state["prefill_item"] = item
-
 st.markdown("---")
-
 # --- Time Selection ---
 use_current_time = st.checkbox("🕒 Use Current Time (UTC+1)", value=False)
 if use_current_time:
@@ -78,9 +66,8 @@ with st.form("entry_form", clear_on_submit=True):
         unit_price = st.number_input("💰 Price per Unit", min_value=0.0, step=0.01, key="unit_price")
         amount = qty * unit_price
         st.info(f"Auto total: ₦{amount:,.2f}")
-
-    location_name = st.text_input("📍 Location (manual input)")
     payment_type = st.radio("💳 Payment Type", ["Cash", "Transfer", "Card"], horizontal=True)
+    location_name = st.text_input("📍 Location (manual input)")
 
     submitted = st.form_submit_button("✅ Submit")
 
