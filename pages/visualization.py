@@ -1,7 +1,10 @@
 import streamlit as st
 st.set_page_config(page_title="Spending Analytics", layout="wide")
 
-from shared import load_all_data, refresh_data, category_budgets ,load_transaction_metadata
+from shared import (
+    load_all_data, refresh_data, category_budgets,
+    load_transaction_metadata, filter_data_by_period
+)
 import pandas as pd
 import pydeck as pdk
 import altair as alt
@@ -9,17 +12,17 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 
-# ✅ Refresh Button (top-level, not nested)
+# ✅ Refresh Button
 if st.button("🔄 Refresh Data"):
     refresh_data()
 
-# ✅ Load data AFTER refresh
+# ✅ Load Data
 df = pd.DataFrame(load_all_data())
-st.title("📊 Spending Visualizations")
-
 df["DATE_dt"] = pd.to_datetime(df["DATE"], format="%m/%d/%Y", errors='coerce')
 df["Amount Spent"] = pd.to_numeric(df["Amount Spent"], errors="coerce")
 df = df[df["ITEM CATEGORY"].str.lower().isin([c.lower() for c in category_budgets if c.lower() not in ["savings", "income"]])]
+
+st.title("📊 Spending Visualizations")
 
 # --- Weekly Spending Bar Chart ---
 st.markdown("## 📅 Weekly Spending")
@@ -36,8 +39,9 @@ if not df_week.empty:
     ).properties(title="Daily Spending", height=250)
     st.altair_chart(bar_chart, use_container_width=True)
 else:
-    st.info("ℹ️ No data for this week yet.")
+    st.info("ℹ No data for this week yet.")
 st.markdown("---")
+
 # --- Today's Breakdown Pie Chart ---
 st.markdown("## 📌 Today's Spending Breakdown")
 today_str = f"{datetime.now().month}/{datetime.now().day}/{datetime.now().year}"
@@ -49,8 +53,9 @@ if not pie_data.empty:
     ).properties(height=350)
     st.altair_chart(pie_chart, use_container_width=True)
 else:
-    st.info("ℹ️ No spending recorded today.")
-st.markdown("---")    
+    st.info("ℹ No spending recorded today.")
+st.markdown("---")
+
 # --- Weekly Box Plot ---
 st.markdown("## 📦 Weekly Spending Distribution (Box Plot)")
 df_box = df_week.dropna(subset=["ITEM CATEGORY", "Amount Spent"])
@@ -63,31 +68,38 @@ if not df_box.empty:
     plt.xticks(rotation=45)
     st.pyplot(fig)
 else:
-    st.info("ℹ️ Not enough data for this week's box plot.")
+    st.info("ℹ Not enough data for this week's box plot.")
 st.markdown("---")
-meta_df=pd.DataFrame(load_transaction_metadata())
+
+# --- MAP SECTION ---
+meta_df = pd.DataFrame(load_transaction_metadata())
 meta_df["LAT"] = pd.to_numeric(meta_df["LAT"], errors="coerce")
 meta_df["LON"] = pd.to_numeric(meta_df["LON"], errors="coerce")
 meta_df = meta_df.dropna(subset=["LAT", "LON"])
 
-# Optional: Merge with main df to get category or amount info
+# Merge with main data
 df_main = pd.DataFrame(load_all_data())
 df_main["No"] = df_main["No"].astype(str)
 meta_df["No"] = meta_df["No"].astype(str)
-
 map_df = pd.merge(meta_df, df_main, on=["DATE", "No"], how="left")
 
-if not map_df.empty:
-    st.markdown("### 📍 Spending Locations Map")
-    
+# --- Add Filter Buttons ---
+st.markdown("## 🗺 Location-Based Spending Map")
+period = st.radio("Select period:", ["Today", "This Week", "This Month"], horizontal=True)
+period_key = {"Today": "today", "This Week": "week", "This Month": "month"}[period]
+filtered_map_df = filter_data_by_period(map_df, period=period_key)
+
+# --- Show Map ---
+if not filtered_map_df.empty:
+    st.markdown(f"### 📍 Spending Map ({period})")
+
     layer = pdk.Layer(
         "ScatterplotLayer",
-        data=map_df,
+        data=filtered_map_df,
         get_position='[LON, LAT]',
         get_radius=100,
         get_fill_color='[255, 140, 0, 160]',
-        pickable=True,
-        tooltip=True
+        pickable=True
     )
 
     tooltip = {
@@ -102,30 +114,32 @@ if not map_df.empty:
     }
 
     view_state = pdk.ViewState(
-        latitude=map_df["LAT"].mean(),
-        longitude=map_df["LON"].mean(),
+        latitude=filtered_map_df["LAT"].mean(),
+        longitude=filtered_map_df["LON"].mean(),
         zoom=11,
         pitch=0
     )
 
     st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip=tooltip))
 else:
-    st.info("ℹ No location-tagged transactions yet.")
+    st.info(f"ℹ No location-tagged transactions for {period.lower()}.")
 
-st.markdown("### 🔥 Top Spending Hotspots")
+# --- Hotspot Table ---
+st.markdown(f"### 🔥 Top Spending Hotspots ({period})")
+if not filtered_map_df.empty:
+    hotspots = filtered_map_df.groupby("LOCATION").agg({
+        "Amount Spent": "sum",
+        "DATE": "max",
+        "No": "count"
+    }).rename(columns={
+        "Amount Spent": "Total Spent",
+        "DATE": "Last Visit",
+        "No": "Visit Count"
+    }).sort_values("Visit Count", ascending=False).reset_index()
 
-hotspots = map_df.groupby("LOCATION").agg({
-    "Amount Spent": "sum",
-    "DATE": "max",
-    "No": "count"
-}).rename(columns={
-    "Amount Spent": "Total Spent",
-    "DATE": "Last Visit",
-    "No": "Visit Count"
-}).sort_values("Visit Count", ascending=False).reset_index()
-
-st.dataframe(hotspots.style.format({
-    "Total Spent": "₦{:.0f}",
-    "Last Visit": lambda d: pd.to_datetime(d).strftime("%b %d, %Y")
-}))
-
+    st.dataframe(hotspots.style.format({
+        "Total Spent": "₦{:.0f}",
+        "Last Visit": lambda d: pd.to_datetime(d).strftime("%b %d, %Y")
+    }))
+else:
+    st.info("ℹ No hotspot data for this period.")
