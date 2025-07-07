@@ -4,7 +4,7 @@ from shared import (
     category_budgets, Spending_Sheet, Meta_Sheet,
     load_all_data, load_item_category_map,
     get_today_count, recommend_items_for_today,
-    refresh_data, save_transaction_metadata
+    refresh_data, save_transaction_metadata,load_transaction_metadata
 )
 from datetime import datetime, timedelta
 import pandas as pd
@@ -120,14 +120,21 @@ st.markdown("---")
 
 # --- TODAY'S TRANSACTIONS ---
 st.markdown("### 📋 Today's Transactions")
+
 today_str = f"{datetime.now().month}/{datetime.now().day}/{datetime.now().year}"
 df_today = df[df["DATE"] == today_str]
 
-if not df_today.empty:
+# 🔗 Load metadata and merge to get LOCATION
+meta_df = pd.DataFrame(load_transaction_metadata())
+meta_df["No"] = meta_df["No"].astype(str)
+df_today["No"] = df_today["No"].astype(str)
+df_today_loc = pd.merge(df_today, meta_df[["DATE", "No", "LOCATION"]], on=["DATE", "No"], how="left")
+
+if not df_today_loc.empty:
     st.dataframe(
-        df_today[["TIME", "ITEM", "ITEM CATEGORY", "No of ITEM", "Amount Spent"]],
+        df_today_loc[["TIME", "ITEM", "ITEM CATEGORY", "No of ITEM", "Amount Spent", "LOCATION"]],
         use_container_width=True,
         hide_index=True
     )
 else:
-    st.info("ℹ️ No transactions recorded yet today.")
+    st.info("ℹ No transactions recorded yet today.")
