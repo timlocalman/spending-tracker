@@ -116,3 +116,18 @@ if submitted:
         # Clear prefill state
         for k in ["prefill_item", "prefill_time", "manual_amt", "unit_price"]:
             st.session_state.pop(k, None)
+st.markdown("---")
+
+# --- TODAY'S TRANSACTIONS ---
+st.markdown("### 📋 Today's Transactions")
+today_str = f"{datetime.now().month}/{datetime.now().day}/{datetime.now().year}"
+df_today = df[df["DATE"] == today_str]
+
+if not df_today.empty:
+    st.dataframe(
+        df_today[["TIME", "ITEM", "ITEM CATEGORY", "No of ITEM", "Amount Spent"]],
+        use_container_width=True,
+        hide_index=True
+    )
+else:
+    st.info("ℹ️ No transactions recorded yet today.")
