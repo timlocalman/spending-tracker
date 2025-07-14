@@ -126,6 +126,12 @@ else:
 
 # --- Hotspot Table ---
 st.markdown(f"### 🔥 Top Spending Hotspots ({period})")
+
+# Exclude savings and income
+filtered_map_df = filtered_map_df[
+    ~filtered_map_df["ITEM CATEGORY"].str.lower().isin(["savings", "income"])
+]
+
 if not filtered_map_df.empty:
     hotspots = filtered_map_df.groupby("LOCATION").agg({
         "Amount Spent": "sum",
